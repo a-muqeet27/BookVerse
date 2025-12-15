@@ -1,12 +1,26 @@
-# bookverse_project
+# BookVerse
 
-A new Flutter project.
+A mobile application built with Flutter to explore the universe of books 📚
+
+## About the Project
+BookVerse allows users to discover, explore, and manage books through an intuitive mobile interface.
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+This project is a Flutter application.
 
-A few resources to get you started if this is your first Flutter project:
+### Prerequisites
+- Flutter SDK
+- Android Studio / VS Code
+- An Android or iOS emulator (or physical device)
+
+### Installation
+1. Clone the repository
+2. Run `flutter pub get`
+3. Run the app using `flutter run`
+
+### Helpful Resources
+If this is your first Flutter project, check out:
 
 - [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
 - [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
