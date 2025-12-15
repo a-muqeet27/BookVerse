@@ -1,7 +1,10 @@
 // main.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'services/auth_service.dart';
+import 'services/user_data_service.dart';
 import 'home_screen.dart';
 import 'categories_screen.dart';
 import 'cart_screen.dart';
@@ -9,11 +12,15 @@ import 'sidebar.dart';
 import 'login_screen.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
-import 'liked_screen.dart'; // ADD THIS IMPORT
-import 'liked_books_service.dart'; // ADD THIS IMPORT
+import 'liked_screen.dart';
+import 'liked_books_service.dart';
 import 'orders_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const BookverseApp());
 }
 
@@ -24,8 +31,22 @@ class BookverseApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (context) => LikedBooksService()),
-        ChangeNotifierProvider(create: (context) => CartModel()),
+        ChangeNotifierProvider(create: (context) => AuthService()),
+        ChangeNotifierProvider(create: (context) => UserDataService()),
+        ChangeNotifierProxyProvider<AuthService, LikedBooksService>(
+          create: (context) => LikedBooksService(),
+          update: (context, authService, likedBooksService) {
+            likedBooksService?.setUserId(authService.userId);
+            return likedBooksService!;
+          },
+        ),
+        ChangeNotifierProxyProvider<AuthService, CartModel>(
+          create: (context) => CartModel(),
+          update: (context, authService, cartModel) {
+            cartModel?.setUserId(authService.userId);
+            return cartModel!;
+          },
+        ),
       ],
       child: MaterialApp(
         title: 'BOOKVERSE',
@@ -61,7 +82,7 @@ class _HomeScreenWithSplashState extends State<HomeScreenWithSplash>
     const CategoriesScreen(),
     const OrdersScreen(),
     const CartScreen(),
-    const LikedScreen(), // This should now work with the imported LikedScreen
+    const LikedScreen(),
   ];
 
   @override

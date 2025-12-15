@@ -1,5 +1,6 @@
 // liked_books_service.dart
 import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LikedBook {
   final String id;
@@ -22,6 +23,31 @@ class LikedBook {
     required this.likedAt,
   });
 
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'title': title,
+      'author': author,
+      'listPrice': listPrice,
+      'ourPrice': ourPrice,
+      'inStock': inStock,
+      'imageUrl': imageUrl,
+    };
+  }
+
+  factory LikedBook.fromMap(String docId, Map<String, dynamic> map) {
+    return LikedBook(
+      id: map['id'] ?? docId,
+      title: map['title'] ?? '',
+      author: map['author'] ?? '',
+      listPrice: map['listPrice'] ?? '',
+      ourPrice: map['ourPrice'] ?? '',
+      inStock: map['inStock'] ?? true,
+      imageUrl: map['imageUrl'] ?? '',
+      likedAt: (map['likedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+    );
+  }
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -34,28 +60,99 @@ class LikedBook {
 }
 
 class LikedBooksService with ChangeNotifier {
-  final List<LikedBook> _likedBooks = [];
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  String? _userId;
+  List<LikedBook> _likedBooks = [];
+  final Set<String> _likedBookIds = {};
 
   List<LikedBook> get likedBooks => List.unmodifiable(_likedBooks);
 
-  bool isBookLiked(String bookId) {
-    return _likedBooks.any((book) => book.id == bookId);
-  }
-
-  void addToLiked(LikedBook book) {
-    if (!isBookLiked(book.id)) {
-      _likedBooks.add(book);
-      notifyListeners();
+  void setUserId(String? userId) {
+    if (_userId != userId) {
+      _userId = userId;
+      if (userId != null && userId.isNotEmpty) {
+        _listenToLikedBooks();
+      } else {
+        _likedBooks = [];
+        _likedBookIds.clear();
+        notifyListeners();
+      }
     }
   }
 
-  void removeFromLiked(String bookId) {
-    _likedBooks.removeWhere((book) => book.id == bookId);
-    notifyListeners();
+  void _listenToLikedBooks() {
+    if (_userId == null || _userId!.isEmpty) return;
+
+    _firestore
+        .collection('users')
+        .doc(_userId)
+        .collection('likedBooks')
+        .orderBy('likedAt', descending: true)
+        .snapshots()
+        .listen((snapshot) {
+      _likedBooks = snapshot.docs
+          .map((doc) => LikedBook.fromMap(doc.id, doc.data()))
+          .toList();
+      _likedBookIds.clear();
+      for (var book in _likedBooks) {
+        _likedBookIds.add(book.id);
+      }
+      notifyListeners();
+    });
   }
 
-  void clearAllLiked() {
-    _likedBooks.clear();
-    notifyListeners();
+  bool isBookLiked(String bookId) {
+    return _likedBookIds.contains(bookId);
+  }
+
+  Future<void> addToLiked(LikedBook book) async {
+    if (_userId == null || _userId!.isEmpty) return;
+    if (isBookLiked(book.id)) return;
+
+    await _firestore
+        .collection('users')
+        .doc(_userId)
+        .collection('likedBooks')
+        .doc(book.id)
+        .set({
+      ...book.toMap(),
+      'likedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> removeFromLiked(String bookId) async {
+    if (_userId == null || _userId!.isEmpty) return;
+
+    await _firestore
+        .collection('users')
+        .doc(_userId)
+        .collection('likedBooks')
+        .doc(bookId)
+        .delete();
+  }
+
+  Future<void> toggleLike(LikedBook book) async {
+    if (isBookLiked(book.id)) {
+      await removeFromLiked(book.id);
+    } else {
+      await addToLiked(book);
+    }
+  }
+
+  Future<void> clearAllLiked() async {
+    if (_userId == null || _userId!.isEmpty) return;
+
+    final batch = _firestore.batch();
+    final likedBooks = await _firestore
+        .collection('users')
+        .doc(_userId)
+        .collection('likedBooks')
+        .get();
+
+    for (var doc in likedBooks.docs) {
+      batch.delete(doc.reference);
+    }
+
+    await batch.commit();
   }
 }

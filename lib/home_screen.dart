@@ -273,7 +273,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         SizedBox(
-          height: showPrices ? 300 : 240,
+          height: 310, // Fixed height to prevent overflow
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -281,7 +281,7 @@ class _HomeScreenState extends State<HomeScreen> {
             itemBuilder: (context, index) {
               final book = books[index];
               final bookId = '${book['title']}-${book['author']}';
-              return BookCardWithActions( // CHANGE THIS LINE - use BookCardWithActions
+              return BookCardWithActions(
                 book: book,
                 bookId: bookId,
               );

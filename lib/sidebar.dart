@@ -1,5 +1,7 @@
 // sidebar.dart
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'services/auth_service.dart';
 import 'login_screen.dart';
 import 'request_book_screen.dart';
 import 'about_screen.dart';
@@ -12,6 +14,8 @@ class SideBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final authService = Provider.of<AuthService>(context);
+
     return Drawer(
       backgroundColor: Colors.white,
       child: ListView(
@@ -24,19 +28,30 @@ class SideBar extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const CircleAvatar(
+                CircleAvatar(
                   radius: 30,
                   backgroundColor: Colors.white,
-                  child: Icon(
-                    Icons.person_outline,
-                    size: 40,
-                    color: Colors.blue,
-                  ),
+                  child: authService.isLoggedIn
+                      ? Text(
+                          _getInitials(authService.userName),
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade700,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.person_outline,
+                          size: 40,
+                          color: Colors.blue,
+                        ),
                 ),
                 const SizedBox(height: 10),
-                const Text(
-                  'Welcome to BOOKVERSE',
-                  style: TextStyle(
+                Text(
+                  authService.isLoggedIn
+                      ? 'Welcome, ${authService.userName}!'
+                      : 'Welcome to BOOKVERSE',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -44,7 +59,9 @@ class SideBar extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Your Universe of Books',
+                  authService.isLoggedIn
+                      ? authService.userEmail
+                      : 'Your Universe of Books',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.8),
                     fontSize: 12,
@@ -54,17 +71,46 @@ class SideBar extends StatelessWidget {
             ),
           ),
 
-          _buildDrawerItem(
-            icon: Icons.person_add,
-            title: 'Sign Up / Login',
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => LoginScreen()),
-              );
-            },
-          ),
+          if (!authService.isLoggedIn)
+            _buildDrawerItem(
+              icon: Icons.person_add,
+              title: 'Sign Up / Login',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                );
+              },
+            ),
+
+          if (authService.isLoggedIn) ...[
+            _buildDrawerItem(
+              icon: Icons.person_outline,
+              title: 'My Profile',
+              onTap: () {
+                Navigator.pop(context);
+                _showProfileDialog(context, authService);
+              },
+            ),
+            _buildDrawerItem(
+              icon: Icons.logout,
+              title: 'Logout',
+              onTap: () async {
+                Navigator.pop(context);
+                await authService.signOut();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Logged out successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              },
+            ),
+            const Divider(),
+          ],
 
           _buildDrawerItem(
             icon: Icons.bookmark_add,
@@ -73,7 +119,7 @@ class SideBar extends StatelessWidget {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => RequestBookScreen()),
+                MaterialPageRoute(builder: (context) => const RequestBookScreen()),
               );
             },
           ),
@@ -85,7 +131,7 @@ class SideBar extends StatelessWidget {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => AboutScreen()),
+                MaterialPageRoute(builder: (context) => const AboutScreen()),
               );
             },
           ),
@@ -97,7 +143,7 @@ class SideBar extends StatelessWidget {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => TermsOfUseScreen()),
+                MaterialPageRoute(builder: (context) => const TermsOfUseScreen()),
               );
             },
           ),
@@ -109,7 +155,7 @@ class SideBar extends StatelessWidget {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => PrivacyPolicyScreen()),
+                MaterialPageRoute(builder: (context) => const PrivacyPolicyScreen()),
               );
             },
           ),
@@ -121,7 +167,7 @@ class SideBar extends StatelessWidget {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => HelpSupportScreen()),
+                MaterialPageRoute(builder: (context) => const HelpSupportScreen()),
               );
             },
           ),
@@ -141,6 +187,15 @@ class SideBar extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _getInitials(String name) {
+    if (name.isEmpty) return 'U';
+    final parts = name.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return name[0].toUpperCase();
   }
 
   Widget _buildDrawerItem({
@@ -171,13 +226,72 @@ class SideBar extends StatelessWidget {
     );
   }
 
-  void _showComingSoonSnackbar(BuildContext context, String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$feature - Coming Soon!'),
-        duration: const Duration(seconds: 2),
-        backgroundColor: Colors.blue.shade700,
+  void _showProfileDialog(BuildContext context, AuthService authService) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('My Profile'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: CircleAvatar(
+                radius: 40,
+                backgroundColor: Colors.blue.shade100,
+                child: Text(
+                  _getInitials(authService.userName),
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade700,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            _buildProfileRow(Icons.person, 'Name', authService.userName),
+            const SizedBox(height: 12),
+            _buildProfileRow(Icons.email, 'Email', authService.userEmail),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildProfileRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: Colors.grey.shade600),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

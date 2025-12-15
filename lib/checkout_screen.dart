@@ -1,8 +1,11 @@
 // checkout_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'cart_screen.dart';
-import 'book_image_widget.dart'; // ADD THIS IMPORT
+import 'book_image_widget.dart';
+import 'services/auth_service.dart';
+import 'login_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({Key? key}) : super(key: key);
@@ -19,14 +22,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   bool _isBillingSameAsDelivery = true;
   String _selectedPaymentMethod = 'cashOnDelivery';
+  bool _isPlacingOrder = false;
 
   final _formKey = GlobalKey<FormState>();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   @override
   void initState() {
     super.initState();
-    // Initialize billing address as empty
     _billingAddressController.text = '';
+    
+    // Pre-fill email if user is logged in
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      if (authService.isLoggedIn) {
+        _emailController.text = authService.userEmail;
+      }
+    });
   }
 
   @override
@@ -38,33 +50,164 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     super.dispose();
   }
 
-  void _placeOrder(BuildContext context) {
-    if (_formKey.currentState!.validate()) {
-      // Show order confirmation dialog
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Order Confirmed!'),
-          content: const Text('Your order has been placed successfully. You will receive a confirmation email shortly.'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context); // Close dialog
-                Navigator.pop(context); // Go back to cart
-                final cartModel = Provider.of<CartModel>(context, listen: false);
-                cartModel.clearCart(); // Clear cart after order
-              },
-              child: const Text('OK'),
-            ),
-          ],
+  Future<void> _placeOrder(BuildContext context) async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    
+    if (!authService.isLoggedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please login to place an order'),
+          backgroundColor: Colors.red,
         ),
       );
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+      return;
+    }
+
+    if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isPlacingOrder = true;
+      });
+
+      try {
+        final cartModel = Provider.of<CartModel>(context, listen: false);
+        
+        // Create order data
+        final orderData = {
+          'email': _emailController.text,
+          'shippingAddress': _deliveryAddressController.text,
+          'billingAddress': _isBillingSameAsDelivery 
+              ? _deliveryAddressController.text 
+              : _billingAddressController.text,
+          'paymentMethod': _selectedPaymentMethod == 'cashOnDelivery' 
+              ? 'Cash on Delivery' 
+              : 'Card on Delivery',
+          'specialInstructions': _specialInstructionsController.text,
+          'items': cartModel.items.map((item) => {
+            'title': item.title,
+            'author': item.author,
+            'listPrice': item.listPrice,
+            'ourPrice': item.ourPrice,
+            'imageUrl': item.imageUrl,
+            'quantity': item.quantity,
+          }).toList(),
+          'totalAmount': cartModel.totalPrice,
+          'status': 'pending',
+          'createdAt': FieldValue.serverTimestamp(),
+        };
+
+        // Save order to Firestore
+        await _firestore
+            .collection('users')
+            .doc(authService.userId)
+            .collection('orders')
+            .add(orderData);
+
+        // Clear cart
+        await cartModel.clearCart();
+
+        setState(() {
+          _isPlacingOrder = false;
+        });
+
+        if (mounted) {
+          // Show order confirmation popup
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.check_circle,
+                      color: Colors.green.shade600,
+                      size: 64,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Order Placed Successfully!',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Your order has been placed. You can view it in the Orders section.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade600,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context); // Close dialog
+                        Navigator.pop(context); // Go back to cart/home
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade600,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'OK',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+      } catch (e) {
+        setState(() {
+          _isPlacingOrder = false;
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to place order: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final cartModel = Provider.of<CartModel>(context);
+    final authService = Provider.of<AuthService>(context);
     final cartItems = cartModel.items;
     final subtotal = cartModel.totalPrice;
     final shipping = 200.0;
@@ -88,163 +231,227 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
         ),
       ),
-      body: cartItems.isEmpty
-          ? _buildEmptyCart()
-          : Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Contact Information
-              _buildSectionHeader('Contact Information'),
-              _buildTextField(
-                controller: _emailController,
-                label: 'Email Address',
-                hintText: 'Enter your email',
-                keyboardType: TextInputType.emailAddress,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your email';
-                  }
-                  if (!value.contains('@')) {
-                    return 'Please enter a valid email';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
+      body: !authService.isLoggedIn
+          ? _buildLoginPrompt()
+          : cartItems.isEmpty
+              ? _buildEmptyCart()
+              : Form(
+                  key: _formKey,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Contact Information
+                        _buildSectionHeader('Contact Information'),
+                        _buildTextField(
+                          controller: _emailController,
+                          label: 'Email Address',
+                          hintText: 'Enter your email',
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your email';
+                            }
+                            if (!value.contains('@')) {
+                              return 'Please enter a valid email';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 20),
 
-              // Delivery Address
-              _buildSectionHeader('Delivery Address'),
-              _buildTextField(
-                controller: _deliveryAddressController,
-                label: 'Delivery Address',
-                hintText: 'Enter your complete delivery address',
-                maxLines: 3,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter delivery address';
-                  }
-                  if (value.length < 10) {
-                    return 'Please enter complete address';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
+                        // Delivery Address
+                        _buildSectionHeader('Delivery Address'),
+                        _buildTextField(
+                          controller: _deliveryAddressController,
+                          label: 'Delivery Address',
+                          hintText: 'Enter your complete delivery address',
+                          maxLines: 3,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter delivery address';
+                            }
+                            if (value.length < 10) {
+                              return 'Please enter complete address';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 20),
 
-              // Billing Address
-              _buildSectionHeader('Billing Address'),
-              Row(
-                children: [
-                  Checkbox(
-                    value: _isBillingSameAsDelivery,
-                    onChanged: (value) {
-                      setState(() {
-                        _isBillingSameAsDelivery = value!;
-                        if (_isBillingSameAsDelivery) {
-                          _billingAddressController.text = _deliveryAddressController.text;
-                        } else {
-                          _billingAddressController.clear();
-                        }
-                      });
-                    },
-                  ),
-                  const Expanded(
-                    child: Text(
-                      'My billing address is same as delivery address',
-                      style: TextStyle(fontSize: 14),
+                        // Billing Address
+                        _buildSectionHeader('Billing Address'),
+                        Row(
+                          children: [
+                            Checkbox(
+                              value: _isBillingSameAsDelivery,
+                              onChanged: (value) {
+                                setState(() {
+                                  _isBillingSameAsDelivery = value!;
+                                  if (_isBillingSameAsDelivery) {
+                                    _billingAddressController.text = _deliveryAddressController.text;
+                                  } else {
+                                    _billingAddressController.clear();
+                                  }
+                                });
+                              },
+                            ),
+                            const Expanded(
+                              child: Text(
+                                'My billing address is same as delivery address',
+                                style: TextStyle(fontSize: 14),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (!_isBillingSameAsDelivery) ...[
+                          const SizedBox(height: 10),
+                          _buildTextField(
+                            controller: _billingAddressController,
+                            label: 'Billing Address',
+                            hintText: 'Enter your complete billing address',
+                            maxLines: 3,
+                            validator: (value) {
+                              if (!_isBillingSameAsDelivery && (value == null || value.isEmpty)) {
+                                return 'Please enter billing address';
+                              }
+                              if (!_isBillingSameAsDelivery && value!.length < 10) {
+                                return 'Please enter complete billing address';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+                        const SizedBox(height: 20),
+
+                        // Payment Method
+                        _buildSectionHeader('Payment Method'),
+                        _buildPaymentMethodCard(
+                          method: 'cashOnDelivery',
+                          title: 'Cash on Delivery',
+                          subtitle: 'Pay when you receive your order',
+                          icon: Icons.money,
+                        ),
+                        const SizedBox(height: 10),
+                        _buildPaymentMethodCard(
+                          method: 'cardOnDelivery',
+                          title: 'Card on Delivery',
+                          subtitle: 'Pay with card when you receive your order',
+                          icon: Icons.credit_card,
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Order Items
+                        _buildSectionHeader('Order Items (${cartItems.length})'),
+                        _buildOrderItems(cartItems),
+                        const SizedBox(height: 20),
+
+                        // Special Instructions
+                        _buildSectionHeader('Special Instructions (Optional)'),
+                        _buildTextField(
+                          controller: _specialInstructionsController,
+                          label: 'Special Instructions',
+                          hintText: 'Any special delivery instructions...',
+                          maxLines: 3,
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Order Summary
+                        _buildSectionHeader('Order Summary'),
+                        _buildOrderSummary(subtotal, shipping, total),
+                        const SizedBox(height: 30),
+
+                        // Place Order Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: ElevatedButton(
+                            onPressed: _isPlacingOrder ? null : () => _placeOrder(context),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue.shade700,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 2,
+                            ),
+                            child: _isPlacingOrder
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  )
+                                : const Text(
+                                    'PLACE ORDER',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
                     ),
                   ),
-                ],
-              ),
-              if (!_isBillingSameAsDelivery) ...[
-                const SizedBox(height: 10),
-                _buildTextField(
-                  controller: _billingAddressController,
-                  label: 'Billing Address',
-                  hintText: 'Enter your complete billing address',
-                  maxLines: 3,
-                  validator: (value) {
-                    if (!_isBillingSameAsDelivery && (value == null || value.isEmpty)) {
-                      return 'Please enter billing address';
-                    }
-                    if (!_isBillingSameAsDelivery && value!.length < 10) {
-                      return 'Please enter complete billing address';
-                    }
-                    return null;
-                  },
                 ),
-                const SizedBox(height: 10),
-              ],
-              const SizedBox(height: 20),
+    );
+  }
 
-              // Payment Method
-              _buildSectionHeader('Payment Method'),
-              _buildPaymentMethodCard(
-                method: 'cashOnDelivery',
-                title: 'Cash on Delivery',
-                subtitle: 'Pay when you receive your order',
-                icon: Icons.money,
-              ),
-              const SizedBox(height: 10),
-              _buildPaymentMethodCard(
-                method: 'cardOnDelivery',
-                title: 'Card on Delivery',
-                subtitle: 'Pay with card when you receive your order',
-                icon: Icons.credit_card,
-              ),
-              const SizedBox(height: 20),
-
-              // Order Items
-              _buildSectionHeader('Order Items (${cartItems.length})'),
-              _buildOrderItems(cartItems),
-              const SizedBox(height: 20),
-
-              // Special Instructions
-              _buildSectionHeader('Special Instructions (Optional)'),
-              _buildTextField(
-                controller: _specialInstructionsController,
-                label: 'Special Instructions',
-                hintText: 'Any special delivery instructions...',
-                maxLines: 3,
-              ),
-              const SizedBox(height: 20),
-
-              // Order Summary
-              _buildSectionHeader('Order Summary'),
-              _buildOrderSummary(subtotal, shipping, total),
-              const SizedBox(height: 30),
-
-              // Place Order Button
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: () => _placeOrder(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue.shade700,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 2,
-                  ),
-                  child: const Text(
-                    'PLACE ORDER',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-            ],
+  Widget _buildLoginPrompt() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.lock_outline,
+            size: 80,
+            color: Colors.grey.shade400,
           ),
-        ),
+          const SizedBox(height: 16),
+          const Text(
+            'Please login to checkout',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'You need to be logged in to place an order',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade700,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'Login',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -325,6 +532,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           keyboardType: keyboardType,
           maxLines: maxLines,
           validator: validator,
+          enabled: !_isPlacingOrder,
           decoration: InputDecoration(
             hintText: hintText,
             hintStyle: TextStyle(color: Colors.grey.shade400),
@@ -387,14 +595,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         trailing: Radio<String>(
           value: method,
           groupValue: _selectedPaymentMethod,
-          onChanged: (String? value) {
+          onChanged: _isPlacingOrder ? null : (String? value) {
             setState(() {
               _selectedPaymentMethod = value!;
             });
           },
           activeColor: Colors.blue.shade700,
         ),
-        onTap: () {
+        onTap: _isPlacingOrder ? null : () {
           setState(() {
             _selectedPaymentMethod = method;
           });
@@ -431,7 +639,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // UPDATED: Replace icon with BookImage
         BookImage(
           imageUrl: item.imageUrl,
           width: 50,

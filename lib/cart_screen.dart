@@ -1,11 +1,14 @@
 // cart_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'sidebar.dart';
 import 'checkout_screen.dart';
-import 'book_image_widget.dart'; // ADD THIS IMPORT
+import 'book_image_widget.dart';
+import 'services/auth_service.dart';
+import 'login_screen.dart';
 
-// Cart Model
+// Cart Item Model
 class CartItem {
   final String id;
   final String title;
@@ -30,44 +33,143 @@ class CartItem {
   bool isSameBook(CartItem other) {
     return title == other.title && author == other.author;
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'title': title,
+      'author': author,
+      'listPrice': listPrice,
+      'ourPrice': ourPrice,
+      'inStock': inStock,
+      'imageUrl': imageUrl,
+      'quantity': quantity,
+    };
+  }
+
+  factory CartItem.fromMap(String id, Map<String, dynamic> map) {
+    return CartItem(
+      id: id,
+      title: map['title'] ?? '',
+      author: map['author'] ?? '',
+      listPrice: map['listPrice'] ?? '',
+      ourPrice: map['ourPrice'] ?? '',
+      inStock: map['inStock'] ?? true,
+      imageUrl: map['imageUrl'] ?? '',
+      quantity: map['quantity'] ?? 1,
+    );
+  }
 }
 
+// Cart Model with Firestore sync
 class CartModel extends ChangeNotifier {
-  final List<CartItem> _items = [];
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  String? _userId;
+  List<CartItem> _items = [];
+  bool _isLoading = false;
 
   List<CartItem> get items => List.unmodifiable(_items);
+  bool get isLoading => _isLoading;
 
-  void addItem(CartItem newItem) {
-    final existingItemIndex = _items.indexWhere((item) => item.isSameBook(newItem));
-
-    if (existingItemIndex != -1) {
-      _items[existingItemIndex].quantity += newItem.quantity;
-    } else {
-      _items.add(newItem);
-    }
-    notifyListeners();
-  }
-
-  void removeItem(String id) {
-    _items.removeWhere((item) => item.id == id);
-    notifyListeners();
-  }
-
-  void updateQuantity(String id, int newQuantity) {
-    final itemIndex = _items.indexWhere((item) => item.id == id);
-    if (itemIndex != -1) {
-      if (newQuantity <= 0) {
-        _items.removeAt(itemIndex);
+  void setUserId(String? userId) {
+    if (_userId != userId) {
+      _userId = userId;
+      if (userId != null && userId.isNotEmpty) {
+        _listenToCart();
       } else {
-        _items[itemIndex].quantity = newQuantity;
+        _items = [];
+        notifyListeners();
       }
-      notifyListeners();
     }
   }
 
-  void clearCart() {
-    _items.clear();
-    notifyListeners();
+  void _listenToCart() {
+    if (_userId == null || _userId!.isEmpty) return;
+
+    _firestore
+        .collection('users')
+        .doc(_userId)
+        .collection('cart')
+        .orderBy('addedAt', descending: true)
+        .snapshots()
+        .listen((snapshot) {
+      _items = snapshot.docs
+          .map((doc) => CartItem.fromMap(doc.id, doc.data()))
+          .toList();
+      notifyListeners();
+    });
+  }
+
+  Future<void> addItem(CartItem newItem) async {
+    if (_userId == null || _userId!.isEmpty) return;
+
+    final cartRef = _firestore
+        .collection('users')
+        .doc(_userId)
+        .collection('cart');
+
+    // Check if item already exists
+    final existingItems = await cartRef
+        .where('title', isEqualTo: newItem.title)
+        .where('author', isEqualTo: newItem.author)
+        .get();
+
+    if (existingItems.docs.isNotEmpty) {
+      // Update quantity
+      final existingDoc = existingItems.docs.first;
+      final currentQty = existingDoc.data()['quantity'] ?? 1;
+      await existingDoc.reference.update({
+        'quantity': currentQty + newItem.quantity,
+      });
+    } else {
+      // Add new item
+      await cartRef.add({
+        ...newItem.toMap(),
+        'addedAt': FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
+  Future<void> removeItem(String id) async {
+    if (_userId == null || _userId!.isEmpty) return;
+
+    await _firestore
+        .collection('users')
+        .doc(_userId)
+        .collection('cart')
+        .doc(id)
+        .delete();
+  }
+
+  Future<void> updateQuantity(String id, int newQuantity) async {
+    if (_userId == null || _userId!.isEmpty) return;
+
+    if (newQuantity <= 0) {
+      await removeItem(id);
+    } else {
+      await _firestore
+          .collection('users')
+          .doc(_userId)
+          .collection('cart')
+          .doc(id)
+          .update({'quantity': newQuantity});
+    }
+  }
+
+  Future<void> clearCart() async {
+    if (_userId == null || _userId!.isEmpty) return;
+
+    final batch = _firestore.batch();
+    final cartItems = await _firestore
+        .collection('users')
+        .doc(_userId)
+        .collection('cart')
+        .get();
+
+    for (var doc in cartItems.docs) {
+      batch.delete(doc.reference);
+    }
+
+    await batch.commit();
   }
 
   double get totalPrice {
@@ -107,12 +209,59 @@ class _CartScreenState extends State<CartScreen> {
   @override
   Widget build(BuildContext context) {
     final cartModel = Provider.of<CartModel>(context);
+    final authService = Provider.of<AuthService>(context);
 
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: _buildAppBar(cartModel),
       drawer: const SideBar(),
-      body: _buildCartContent(cartModel),
+      body: authService.isLoggedIn 
+          ? _buildCartContent(cartModel) 
+          : _buildLoginPrompt(),
+    );
+  }
+
+  Widget _buildLoginPrompt() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.shopping_cart_outlined,
+            size: 80,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Please login to view your cart',
+            style: TextStyle(
+              fontSize: 18,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade700,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'Login',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -238,7 +387,6 @@ class _CartScreenState extends State<CartScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // UPDATED: Replace icon with BookImage
               BookImage(
                 imageUrl: item.imageUrl,
                 width: 50,

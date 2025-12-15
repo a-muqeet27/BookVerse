@@ -2,7 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'liked_books_service.dart';
-import 'book_image_widget.dart'; // ADD THIS IMPORT
+import 'book_image_widget.dart';
+import 'services/auth_service.dart';
+import 'login_screen.dart';
 
 class LikedScreen extends StatelessWidget {
   const LikedScreen({Key? key}) : super(key: key);
@@ -10,6 +12,7 @@ class LikedScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final likedBooksService = Provider.of<LikedBooksService>(context);
+    final authService = Provider.of<AuthService>(context);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -33,7 +36,7 @@ class LikedScreen extends StatelessWidget {
           ),
         ),
         actions: [
-          if (likedBooksService.likedBooks.isNotEmpty)
+          if (authService.isLoggedIn && likedBooksService.likedBooks.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_outline, color: Colors.black),
               onPressed: () {
@@ -46,11 +49,57 @@ class LikedScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: _buildLikedContent(likedBooksService),
+      body: authService.isLoggedIn 
+          ? _buildLikedContent(likedBooksService, context) 
+          : _buildLoginPrompt(context),
     );
   }
 
-  Widget _buildLikedContent(LikedBooksService likedBooksService) {
+  Widget _buildLoginPrompt(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.favorite_outline,
+            size: 80,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Please login to view your liked books',
+            style: TextStyle(
+              fontSize: 18,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade700,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'Login',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLikedContent(LikedBooksService likedBooksService, BuildContext context) {
     if (likedBooksService.likedBooks.isEmpty) {
       return Center(
         child: Column(
@@ -141,7 +190,6 @@ class LikedScreen extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // UPDATED: Replace icon with BookImage
           BookImage(
             imageUrl: book.imageUrl,
             width: 80,
