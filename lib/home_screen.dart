@@ -85,6 +85,13 @@ class _HomeScreenState extends State<HomeScreen> {
     return Consumer<BooksService>(
       builder: (context, booksService, _) {
         final filteredBooks = _getFilteredBooks(booksService);
+        final hasSearch = _searchController.text.trim().isNotEmpty;
+        final hasFilter = (_filterTitle?.isNotEmpty ?? false) ||
+            (_filterAuthor?.isNotEmpty ?? false) ||
+            (_filterCategory?.isNotEmpty ?? false) ||
+            (_filterPriceRange?.isNotEmpty ?? false) ||
+            (_filterLanguage?.isNotEmpty ?? false);
+        final isFilteredView = hasSearch || hasFilter;
         return Scaffold(
           backgroundColor: Colors.grey.shade50,
           appBar: AppBar(
@@ -205,11 +212,18 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                   )
+                else if (isFilteredView)
+                  // When searching or filtering: show only the matching books
+                  _buildSectionWithActions('All Books', filteredBooks)
                 else
+                  // Default home view: all books + home screen categories
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildSectionWithActions('All Books', filteredBooks),
+                      _buildSectionWithActions(
+                        'All Books',
+                        _mapBooksToList(booksService.books),
+                      ),
                       _buildSectionWithActions(
                         'New at Book Verse',
                         _getHomeCategoryBooks(
