@@ -5,6 +5,7 @@ import 'liked_books_service.dart';
 import 'book_image_widget.dart';
 import 'services/auth_service.dart';
 import 'login_screen.dart';
+import 'book_detail_screen.dart';
 
 class LikedScreen extends StatelessWidget {
   const LikedScreen({Key? key}) : super(key: key);
@@ -43,10 +44,6 @@ class LikedScreen extends StatelessWidget {
                 _showClearAllDialog(context, likedBooksService);
               },
             ),
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: Colors.black),
-            onPressed: () {},
-          ),
         ],
       ),
       body: authService.isLoggedIn 
@@ -172,134 +169,160 @@ class LikedScreen extends StatelessWidget {
   }
 
   Widget _buildLikedBookCard(LikedBook book, LikedBooksService likedBooksService, BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+    final detailBook = {
+      'id': book.id,
+      'title': book.title,
+      'author': book.author,
+      'listPrice': book.listPrice,
+      'ourPrice': book.ourPrice,
+      'inStock': book.inStock,
+      'imageUrl': book.imageUrl,
+      'quantity': book.inStock ? 1 : 0,
+      'category': '',
+      'language': 'English',
+      'pages': 0,
+      'weight': '',
+      'about': '',
+    };
+
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => BookDetailScreen(book: detailBook, bookId: book.id),
           ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          BookImage(
-            imageUrl: book.imageUrl,
-            width: 80,
-            height: 100,
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  book.title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade300),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            BookImage(
+              imageUrl: book.imageUrl,
+              width: 80,
+              height: 100,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    book.title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  book.author,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
+                  const SizedBox(height: 4),
+                  Text(
+                    book.author,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade600,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Text(
-                      'List Price: ',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-                    Text(
-                      book.listPrice,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade500,
-                        decoration: TextDecoration.lineThrough,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Text(
-                      'Our Price: ',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade700,
-                      ),
-                    ),
-                    Text(
-                      book.ourPrice,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.orange,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: book.inStock ? Colors.green.shade50 : Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(
-                          color: book.inStock ? Colors.green.shade200 : Colors.red.shade200,
-                        ),
-                      ),
-                      child: Text(
-                        book.inStock ? 'In Stock' : 'Out of Stock',
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text(
+                        'List Price: ',
                         style: TextStyle(
                           fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: book.inStock ? Colors.green.shade700 : Colors.red.shade700,
+                          color: Colors.grey.shade500,
                         ),
                       ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      _formatDate(book.likedAt),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade500,
+                      Text(
+                        book.listPrice,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade500,
+                          decoration: TextDecoration.lineThrough,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Text(
+                        'Our Price: ',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                      Text(
+                        book.ourPrice,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: book.inStock ? Colors.green.shade50 : Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: book.inStock ? Colors.green.shade200 : Colors.red.shade200,
+                          ),
+                        ),
+                        child: Text(
+                          book.inStock ? 'In Stock' : 'Out of Stock',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: book.inStock ? Colors.green.shade700 : Colors.red.shade700,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        _formatDate(book.likedAt),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.favorite, color: Colors.red),
-            onPressed: () {
-              likedBooksService.removeFromLiked(book.id);
-            },
-          ),
-        ],
+            IconButton(
+              icon: const Icon(Icons.favorite, color: Colors.red),
+              onPressed: () {
+                likedBooksService.removeFromLiked(book.id);
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

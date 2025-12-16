@@ -5,6 +5,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'services/auth_service.dart';
 import 'services/user_data_service.dart';
+import 'services/books_service.dart';
+import 'services/request_book_service.dart';
 import 'home_screen.dart';
 import 'categories_screen.dart';
 import 'cart_screen.dart';
@@ -47,6 +49,8 @@ class BookverseApp extends StatelessWidget {
             return cartModel!;
           },
         ),
+        ChangeNotifierProvider(create: (context) => BooksService()),
+        ChangeNotifierProvider(create: (context) => RequestBookService()),
       ],
       child: MaterialApp(
         title: 'BOOKVERSE',

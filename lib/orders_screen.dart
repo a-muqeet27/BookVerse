@@ -6,6 +6,7 @@ import 'sidebar.dart';
 import 'book_image_widget.dart';
 import 'services/auth_service.dart';
 import 'login_screen.dart';
+import 'cart_screen.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({Key? key}) : super(key: key);
@@ -234,12 +235,6 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
           ),
         ],
       ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.notifications_outlined, color: Colors.black),
-          onPressed: () {},
-        ),
-      ],
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
         child: Container(
@@ -433,22 +428,6 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                       child: const Text('Reorder'),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        _rateOrder(orderId);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text('Rate & Review'),
-                    ),
-                  ),
                 ],
               ),
           ],
@@ -629,19 +608,31 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
   }
 
   void _reorderItems(List<dynamic> items) {
+    final cartModel = Provider.of<CartModel>(context, listen: false);
+
+    for (final raw in items) {
+      final item = raw as Map<String, dynamic>;
+      final int qty = (item['quantity'] ?? 1) as int;
+
+      final cartItem = CartItem(
+        bookId: item['bookId'] as String?,
+        id: '${item['title']}-${DateTime.now().millisecondsSinceEpoch}',
+        title: (item['title'] ?? '') as String,
+        author: (item['author'] ?? '') as String,
+        listPrice: (item['listPrice'] ?? '') as String,
+        ourPrice: (item['ourPrice'] ?? '') as String,
+        inStock: true,
+        imageUrl: (item['imageUrl'] ?? '') as String,
+        quantity: qty,
+      );
+
+      cartModel.addItem(cartItem);
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Added ${items.length} items to cart'),
         backgroundColor: Colors.green,
-      ),
-    );
-  }
-
-  void _rateOrder(String orderId) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Rate & review order #${orderId.substring(0, 8).toUpperCase()}'),
-        duration: const Duration(seconds: 2),
       ),
     );
   }

@@ -10,6 +10,7 @@ import 'login_screen.dart';
 
 // Cart Item Model
 class CartItem {
+  final String? bookId;
   final String id;
   final String title;
   final String author;
@@ -20,6 +21,7 @@ class CartItem {
   int quantity;
 
   CartItem({
+    this.bookId,
     required this.id,
     required this.title,
     required this.author,
@@ -36,6 +38,7 @@ class CartItem {
 
   Map<String, dynamic> toMap() {
     return {
+      'bookId': bookId,
       'title': title,
       'author': author,
       'listPrice': listPrice,
@@ -48,6 +51,7 @@ class CartItem {
 
   factory CartItem.fromMap(String id, Map<String, dynamic> map) {
     return CartItem(
+      bookId: map['bookId'],
       id: id,
       title: map['title'] ?? '',
       author: map['author'] ?? '',
@@ -108,15 +112,21 @@ class CartModel extends ChangeNotifier {
         .collection('cart');
 
     // Check if item already exists
-    final existingItems = await cartRef
-        .where('title', isEqualTo: newItem.title)
-        .where('author', isEqualTo: newItem.author)
-        .get();
+    QuerySnapshot existingItems;
+    if (newItem.bookId != null && newItem.bookId!.isNotEmpty) {
+      existingItems = await cartRef.where('bookId', isEqualTo: newItem.bookId).get();
+    } else {
+      existingItems = await cartRef
+          .where('title', isEqualTo: newItem.title)
+          .where('author', isEqualTo: newItem.author)
+          .get();
+    }
 
     if (existingItems.docs.isNotEmpty) {
       // Update quantity
       final existingDoc = existingItems.docs.first;
-      final currentQty = existingDoc.data()['quantity'] ?? 1;
+      final data = existingDoc.data() as Map<String, dynamic>;
+      final int currentQty = (data['quantity'] ?? 1) as int;
       await existingDoc.reference.update({
         'quantity': currentQty + newItem.quantity,
       });
@@ -175,12 +185,7 @@ class CartModel extends ChangeNotifier {
   double get totalPrice {
     double total = 0;
     for (var item in _items) {
-      final priceString = item.ourPrice.replaceAll('Rs ', '')
-          .replaceAll('£ ', '')
-          .replaceAll('\$ ', '')
-          .replaceAll(',', '')
-          .trim();
-      final price = double.tryParse(priceString) ?? 0.0;
+      final price = _parsePrice(item.ourPrice);
       total += price * item.quantity;
     }
     return total;
@@ -195,6 +200,13 @@ class CartModel extends ChangeNotifier {
   }
 
   int get uniqueItemsCount => _items.length;
+
+  double _parsePrice(String priceStr) {
+    final numeric = priceStr
+        .replaceAll(RegExp(r'[^0-9]'), '')
+        .trim();
+    return double.tryParse(numeric) ?? 0.0;
+  }
 }
 
 // Cart Screen
@@ -323,10 +335,6 @@ class _CartScreenState extends State<CartScreen> {
               ),
           ],
         ),
-        IconButton(
-          icon: const Icon(Icons.notifications_outlined, color: Colors.black),
-          onPressed: () {},
-        ),
       ],
     );
   }
@@ -373,6 +381,9 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Widget _buildCartItem(CartItem item, CartModel cartModel) {
+    final unitPrice = cartModel._parsePrice(item.ourPrice);
+    final lineTotal = unitPrice * item.quantity;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -550,6 +561,31 @@ class _CartScreenState extends State<CartScreen> {
                       constraints: const BoxConstraints(),
                     ),
                   ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 8),
+
+          // Line total for this item
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Item Total',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade700,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                'Rs ${lineTotal.toStringAsFixed(0)}',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
                 ),
               ),
             ],

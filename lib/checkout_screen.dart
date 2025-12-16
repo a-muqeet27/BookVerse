@@ -6,6 +6,7 @@ import 'cart_screen.dart';
 import 'book_image_widget.dart';
 import 'services/auth_service.dart';
 import 'login_screen.dart';
+import 'services/books_service.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({Key? key}) : super(key: key);
@@ -52,6 +53,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _placeOrder(BuildContext context) async {
     final authService = Provider.of<AuthService>(context, listen: false);
+    final booksService = Provider.of<BooksService>(context, listen: false);
     
     if (!authService.isLoggedIn) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -87,6 +89,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               : 'Card on Delivery',
           'specialInstructions': _specialInstructionsController.text,
           'items': cartModel.items.map((item) => {
+            'bookId': item.bookId,
             'title': item.title,
             'author': item.author,
             'listPrice': item.listPrice,
@@ -105,6 +108,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             .doc(authService.userId)
             .collection('orders')
             .add(orderData);
+
+        // Decrease quantities in inventory
+        for (final item in cartModel.items) {
+          if (item.bookId != null && item.bookId!.isNotEmpty) {
+            await booksService.decreaseQuantity(item.bookId!, item.quantity);
+          }
+        }
 
         // Clear cart
         await cartModel.clearCart();

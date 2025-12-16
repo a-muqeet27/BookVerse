@@ -1,5 +1,8 @@
 // request_book_screen.dart
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'services/request_book_service.dart';
+import 'services/auth_service.dart';
 
 class RequestBookScreen extends StatefulWidget {
   const RequestBookScreen({Key? key}) : super(key: key);
@@ -18,20 +21,33 @@ class _RequestBookScreenState extends State<RequestBookScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   bool _requestSent = false;
+  String? _error;
 
-  void _sendRequest() {
+  Future<void> _sendRequest() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
+        _error = null;
       });
 
-      // Simulate API call or request processing
-      Future.delayed(const Duration(seconds: 2), () {
+      final requestService =
+          Provider.of<RequestBookService>(context, listen: false);
+
+      final success = await requestService.submitRequest(
+        userName: _nameController.text.trim(),
+        userEmail: _emailController.text.trim(),
+        bookTitle: _bookTitleController.text.trim(),
+        authorName: _authorController.text.trim(),
+        additionalInfo: _additionalInfoController.text.trim(),
+      );
+
+      if (mounted) {
         setState(() {
           _isLoading = false;
-          _requestSent = true;
+          _requestSent = success;
+          _error = success ? null : 'Something went wrong. Please try again.';
         });
-      });
+      }
     }
   }
 
@@ -53,6 +69,15 @@ class _RequestBookScreenState extends State<RequestBookScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authService = Provider.of<AuthService>(context);
+    if (authService.isLoggedIn) {
+      if (_nameController.text.isEmpty) {
+        _nameController.text = authService.userName;
+      }
+      if (_emailController.text.isEmpty) {
+        _emailController.text = authService.userEmail;
+      }
+    }
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -233,6 +258,26 @@ class _RequestBookScreenState extends State<RequestBookScreen> {
                 ),
               ),
               const SizedBox(height: 40),
+
+              if (_error != null) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Text(
+                    _error!,
+                    style: TextStyle(
+                      color: Colors.red.shade700,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
 
               // Send Request Button
               SizedBox(

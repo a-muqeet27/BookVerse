@@ -5,7 +5,8 @@ import 'sidebar.dart';
 import 'cart_screen.dart';
 import 'liked_books_service.dart';
 import 'book_image_widget.dart';
-import 'categories_screen.dart'; // Import categories screen to access categoryBooks
+import 'book_detail_screen.dart';
+import 'services/books_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -16,114 +17,42 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
+  String? _filterTitle;
+  String? _filterAuthor;
+  String? _filterCategory;
+  String? _filterPriceRange;
+  String? _filterLanguage;
 
-  // Get all books from categories_screen.dart
-  List<Map<String, dynamic>> get allBooks {
-    List<Map<String, dynamic>> allBooks = [];
-
-    BooksData.categoryBooks.forEach((category, books) {
-      allBooks.addAll(books);
-    });
-
-    // Remove duplicates based on title and author
-    final uniqueBooks = <String, Map<String, dynamic>>{};
-    for (var book in allBooks) {
-      final key = '${book['title']}-${book['author']}';
-      if (!uniqueBooks.containsKey(key)) {
-        uniqueBooks[key] = book;
-      }
-    }
-
-    return uniqueBooks.values.toList();
+  List<Map<String, dynamic>> _mapBooksToList(List<Book> books) {
+    return books.map((book) {
+      return {
+        'id': book.id,
+        'title': book.title,
+        'author': book.author,
+        'listPrice': book.listPrice,
+        'ourPrice': book.ourPrice,
+        'inStock': book.inStock,
+        'imageUrl': book.imageUrl,
+        'category': book.category,
+        'language': book.language,
+        'pages': book.pages,
+        'weight': book.weight,
+        'about': book.about,
+        'quantity': book.quantity,
+      };
+    }).toList();
   }
 
-  // Specific sections with their own books
-  final List<Map<String, dynamic>> newAtBookVerse = [
-    {
-      'title': 'Leap Ahead Workbook',
-      'author': 'Igloo Books',
-      'listPrice': 'Rs 899',
-      'ourPrice': 'Rs 809',
-      'inStock': true,
-      'imageUrl': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRfog2Gh9Es02keV01SLpML-0pAmw6JGxu_qA&s'
-    },
-    {
-      'title': 'Your Fault: Culpable',
-      'author': 'Mercedes Ron',
-      'listPrice': 'Rs 999',
-      'ourPrice': 'Rs 899',
-      'inStock': true,
-      'imageUrl': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRfog2Gh9Es02keV01SLpML-0pAmw6JGxu_qA&s'
-    },
-    {
-      'title': 'Atomic Habits',
-      'author': 'James Clear',
-      'listPrice': 'Rs 1199',
-      'ourPrice': 'Rs 1079',
-      'inStock': true,
-      'imageUrl': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRfog2Gh9Es02keV01SLpML-0pAmw6JGxu_qA&s'
-    },
-  ];
-
-  final List<Map<String, dynamic>> newInPublications = [
-    {
-      'title': 'Beyond The Surface',
-      'author': 'Qasim Rafique',
-      'listPrice': 'Rs 1599',
-      'ourPrice': 'Rs 1439',
-      'inStock': true,
-      'imageUrl': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRfog2Gh9Es02keV01SLpML-0pAmw6JGxu_qA&s'
-    },
-    {
-      'title': 'Cholistani Lok Kaha',
-      'author': 'Ahmed Ghazaali Shahe',
-      'listPrice': 'Rs 1399',
-      'ourPrice': 'Rs 1259',
-      'inStock': true,
-      'imageUrl': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRfog2Gh9Es02keV01SLpML-0pAmw6JGxu_qA&s'
-    },
-  ];
-
-  final List<Map<String, dynamic>> comingSoon = [
-    {
-      'title': 'Big Trust: Rewire Self-Doubt',
-      'author': 'Shade Zahrai',
-      'listPrice': '\$19.99',
-      'ourPrice': 'Rs 3055',
-      'stockDate': 'In Stock Around 30 Jan 2026',
-      'imageUrl': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRfog2Gh9Es02keV01SLpML-0pAmw6JGxu_qA&s'
-    },
-  ];
-
-  final List<Map<String, dynamic>> internationalBestsellers = [
-    {
-      'title': 'Releasing 10',
-      'author': 'Chloe Walsh',
-      'listPrice': '£ 10.99',
-      'ourPrice': 'Rs 2470',
-      'inStock': true,
-      'imageUrl': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRfog2Gh9Es02keV01SLpML-0pAmw6JGxu_qA&s'
-    },
-  ];
-
-  final List<Map<String, dynamic>> bestsellerPublications = [
-    {
-      'title': 'White Nights',
-      'author': 'Fyodor Dostoyevsky',
-      'listPrice': 'Rs 350',
-      'ourPrice': 'Rs 315',
-      'inStock': true,
-      'imageUrl': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRfog2Gh9Es02keV01SLpML-0pAmw6JGxu_qA&s'
-    },
-    {
-      'title': 'Crime And Punishment',
-      'author': 'Fyodor Dostoyevsky',
-      'listPrice': 'Rs 450',
-      'ourPrice': 'Rs 405',
-      'inStock': true,
-      'imageUrl': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRfog2Gh9Es02keV01SLpML-0pAmw6JGxu_qA&s'
-    },
-  ];
+  List<Map<String, dynamic>> _getHomeCategoryBooks(
+    BooksService booksService,
+    String homescreenCategoryLabel,
+  ) {
+    final key = homescreenCategoryLabel.toLowerCase().trim();
+    final books = booksService.books.where((book) {
+      return book.homescreenCategory.toLowerCase().trim() == key;
+    }).toList();
+    return _mapBooksToList(books);
+  }
 
   void _showFilterDialog() {
     showModalBottomSheet(
@@ -132,126 +61,208 @@ class _HomeScreenState extends State<HomeScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => const FilterSheet(),
+      builder: (context) => FilterSheet(
+        initialTitle: _filterTitle,
+        initialAuthor: _filterAuthor,
+        initialCategory: _filterCategory,
+        initialPriceRange: _filterPriceRange,
+        initialLanguage: _filterLanguage,
+        onApply: (filters) {
+          setState(() {
+            _filterTitle = filters['title'];
+            _filterAuthor = filters['author'];
+            _filterCategory = filters['category'];
+            _filterPriceRange = filters['priceRange'];
+            _filterLanguage = filters['language'];
+          });
+        },
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: Builder(
-          builder: (context) =>
-              IconButton(
-                icon: const Icon(Icons.menu, color: Colors.black),
-                onPressed: () {
-                  Scaffold.of(context).openDrawer();
-                },
-              ),
-        ),
-        title: Row(
-          children: [
-            Text(
-              'BOOKVERSE',
-              style: TextStyle(
-                color: Colors.blue.shade700,
-                fontWeight: FontWeight.bold,
-                fontSize: 24,
-              ),
+    return Consumer<BooksService>(
+      builder: (context, booksService, _) {
+        final filteredBooks = _getFilteredBooks(booksService);
+        return Scaffold(
+          backgroundColor: Colors.grey.shade50,
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            leading: Builder(
+              builder: (context) =>
+                  IconButton(
+                    icon: const Icon(Icons.menu, color: Colors.black),
+                    onPressed: () {
+                      Scaffold.of(context).openDrawer();
+                    },
+                  ),
             ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: Colors.black),
-            onPressed: () {},
+            title: Row(
+              children: [
+                Text(
+                  'BOOKVERSE',
+                  style: TextStyle(
+                    color: Colors.blue.shade700,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 24,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
-      drawer: const SideBar(),
-      body: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Search bar and filter button
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.1),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
+          drawer: const SideBar(),
+          body: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Search bar and filter button
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.withOpacity(0.1),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: 'Search books...',
-                          hintStyle: TextStyle(color: Colors.grey.shade400),
-                          prefixIcon: Icon(Icons.search,
-                              color: Colors.grey.shade400),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
+                          child: TextField(
+                            controller: _searchController,
+                            decoration: InputDecoration(
+                              hintText: 'Search books...',
+                              hintStyle: TextStyle(color: Colors.grey.shade400),
+                              prefixIcon: Icon(Icons.search,
+                                  color: Colors.grey.shade400),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
+                            ),
+                            onChanged: (_) {
+                              setState(() {});
+                            },
                           ),
                         ),
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade700,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.blue.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.tune, color: Colors.white),
+                          onPressed: _showFilterDialog,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade700,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.blue.withOpacity(0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
+                ),
+
+                if (booksService.isLoading)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                else if (filteredBooks.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'No book found',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: 6),
+                        Text(
+                          'Try a different search or filter',
+                          style: TextStyle(color: Colors.grey),
                         ),
                       ],
                     ),
-                    child: IconButton(
-                      icon: const Icon(Icons.tune, color: Colors.white),
-                      onPressed: _showFilterDialog,
-                    ),
+                  )
+                else
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSectionWithActions('All Books', filteredBooks),
+                      _buildSectionWithActions(
+                        'New at Book Verse',
+                        _getHomeCategoryBooks(
+                          booksService,
+                          'New at Book Verse',
+                        ),
+                      ),
+                      _buildSectionWithActions(
+                        'Coming Soon',
+                        _getHomeCategoryBooks(
+                          booksService,
+                          'Coming Soon',
+                        ),
+                      ),
+                      _buildSectionWithActions(
+                        'Best Sellers',
+                        _getHomeCategoryBooks(
+                          booksService,
+                          'Best Sellers',
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+
+                const SizedBox(height: 20),
+              ],
             ),
-
-            // All Books Section (contains all books from categories_screen.dart)
-            _buildSectionWithActions('All Books', allBooks),
-
-            // Other sections with only their specific books
-            _buildSectionWithActions('New At BookVerse', newAtBookVerse),
-            _buildSection('New In Our Publications', newInPublications, true),
-            _buildSection('Coming Soon (Pre Order)', comingSoon, false,
-                isComingSoon: true),
-            _buildSection(
-                'International Bestsellers', internationalBestsellers, true),
-            _buildSection(
-                'Bestsellers In Our Publications', bestsellerPublications,
-                true),
-
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
+  }
+
+  List<Map<String, dynamic>> _getFilteredBooks(BooksService booksService) {
+    var filtered = booksService.filterBooks(
+      title: _filterTitle,
+      author: _filterAuthor,
+      category: _filterCategory,
+      priceRange: _filterPriceRange,
+      language: _filterLanguage,
+    );
+
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isNotEmpty) {
+      filtered = filtered.where((book) {
+        return book.title.toLowerCase().contains(query) ||
+            book.author.toLowerCase().contains(query) ||
+            book.category.toLowerCase().contains(query) ||
+            book.language.toLowerCase().contains(query);
+      }).toList();
+    }
+
+    return _mapBooksToList(filtered);
   }
 
   Widget _buildSection(String title, List<Map<String, dynamic>> books,
@@ -280,7 +291,7 @@ class _HomeScreenState extends State<HomeScreen> {
             itemCount: books.length,
             itemBuilder: (context, index) {
               final book = books[index];
-              final bookId = '${book['title']}-${book['author']}';
+            final bookId = book['id'] ?? '${book['title']}-${book['author']}';
               return BookCardWithActions(
                 book: book,
                 bookId: bookId,
@@ -584,233 +595,249 @@ class BookCardWithActions extends StatelessWidget {
     final likedBooksService = Provider.of<LikedBooksService>(context);
     final isLiked = likedBooksService.isBookLiked(bookId);
 
+    final inStockQuantity = (book['quantity'] ?? 0) as int;
+    final isAvailable = inStockQuantity > 0 || (book['inStock'] ?? false) == true;
+
     return SizedBox(
       height: 280, // Original smaller height
       width: 170,  // Original smaller width
-      child: Container(
-        margin: const EdgeInsets.only(right: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => BookDetailScreen(book: book, bookId: bookId),
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Book Image
-            Container(
-              height: 120, // Smaller image height
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade200,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+          );
+        },
+        child: Container(
+          margin: const EdgeInsets.only(right: 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
               ),
-              child: Center(
-                child: BookImage(
-                  imageUrl: book['imageUrl'] ?? 'https://picsum.photos/200/300',
-                  width: 80,  // Smaller image
-                  height: 100, // Smaller image
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Book Image
+              Container(
+                height: 120, // Smaller image height
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                ),
+                child: Center(
+                  child: BookImage(
+                    imageUrl: book['imageUrl'] ?? 'https://picsum.photos/200/300',
+                    width: 80,  // Smaller image
+                    height: 100, // Smaller image
+                  ),
                 ),
               ),
-            ),
 
-            // Book Details
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Title with fixed height and overflow
-                    SizedBox(
-                      height: 36,
-                      child: Text(
-                        book['title'] ?? 'No Title',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+              // Book Details
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Title with fixed height and overflow
+                      SizedBox(
+                        height: 36,
+                        child: Text(
+                          book['title'] ?? 'No Title',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    const SizedBox(height: 2),
+                      const SizedBox(height: 2),
 
-                    // Author
-                    SizedBox(
-                      height: 14,
-                      child: Text(
-                        book['author'] ?? 'Unknown Author',
+                      // Author
+                      SizedBox(
+                        height: 14,
+                        child: Text(
+                          book['author'] ?? 'Unknown Author',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey.shade600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+
+                      const Spacer(),
+
+                      // Prices
+                      if (book['listPrice'] != null) ...[
+                        Row(
+                          children: [
+                            Text(
+                              'List Price',
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: Colors.grey.shade500,
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              book['listPrice'],
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: Colors.grey.shade500,
+                                decoration: TextDecoration.lineThrough,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 1),
+                        Row(
+                          children: [
+                            Text(
+                              'Our Price',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              book['ourPrice'] ?? 'Rs 999',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.orange,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ] else ...[
+                        Row(
+                          children: [
+                            Text(
+                              'Our Price',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                            const Spacer(),
+                            const Text(
+                              'Rs 999',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.orange,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      const SizedBox(height: 4),
+                      Text(
+                        isAvailable
+                            ? 'In Stock (${inStockQuantity.clamp(0, 999)})'
+                            : 'Out of Stock',
                         style: TextStyle(
                           fontSize: 10,
-                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w600,
+                          color: isAvailable ? Colors.green : Colors.red,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-
-                    const Spacer(),
-
-                    // Prices
-                    if (book['listPrice'] != null) ...[
-                      Row(
-                        children: [
-                          Text(
-                            'List Price',
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: Colors.grey.shade500,
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            book['listPrice'],
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: Colors.grey.shade500,
-                              decoration: TextDecoration.lineThrough,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 1),
-                      Row(
-                        children: [
-                          Text(
-                            'Our Price',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            book['ourPrice'] ?? 'Rs 999',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.orange,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ] else ...[
-                      Row(
-                        children: [
-                          Text(
-                            'Our Price',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                          const Spacer(),
-                          const Text(
-                            'Rs 999',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.orange,
-                            ),
-                          ),
-                        ],
                       ),
                     ],
-                    const SizedBox(height: 4),
-                    const Text(
-                      'In Stock',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.green,
+                  ),
+                ),
+              ),
+
+              // Action Buttons
+              Container(
+                height: 36,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        isLiked ? Icons.favorite : Icons.favorite_outline,
+                        size: 16,
+                        color: isLiked ? Colors.red : Colors.grey.shade600,
                       ),
+                      onPressed: () {
+                        if (isLiked) {
+                          likedBooksService.removeFromLiked(bookId);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Removed from liked books'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        } else {
+                          final likedBook = LikedBook(
+                            id: bookId,
+                            title: book['title'] ?? '',
+                            author: book['author'] ?? '',
+                            listPrice: book['listPrice'] ?? '',
+                            ourPrice: book['ourPrice'] ?? '',
+                            inStock: book['inStock'] ?? true,
+                            imageUrl: book['imageUrl'] ?? '',
+                            likedAt: DateTime.now(),
+                          );
+                          likedBooksService.addToLiked(likedBook);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Added to liked books'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.shopping_cart_outlined, size: 16),
+                      onPressed: () {
+                        final cartModel = Provider.of<CartModel>(context, listen: false);
+                        final cartItem = CartItem(
+                          bookId: book['id'],
+                          id: '${book['title']}-${DateTime.now().millisecondsSinceEpoch}',
+                          title: book['title'] ?? '',
+                          author: book['author'] ?? '',
+                          listPrice: book['listPrice'] ?? 'Rs 999',
+                          ourPrice: book['ourPrice'] ?? 'Rs 999',
+                          inStock: isAvailable,
+                          imageUrl: book['imageUrl'] ?? '',
+                        );
+                        cartModel.addItem(cartItem);
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('${book['title']} added to cart'),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      color: Colors.grey.shade600,
                     ),
                   ],
                 ),
               ),
-            ),
-
-            // Action Buttons
-            Container(
-              height: 36,
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      isLiked ? Icons.favorite : Icons.favorite_outline,
-                      size: 16,
-                      color: isLiked ? Colors.red : Colors.grey.shade600,
-                    ),
-                    onPressed: () {
-                      if (isLiked) {
-                        likedBooksService.removeFromLiked(bookId);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Removed from liked books'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      } else {
-                        final likedBook = LikedBook(
-                          id: bookId,
-                          title: book['title'] ?? '',
-                          author: book['author'] ?? '',
-                          listPrice: book['listPrice'] ?? '',
-                          ourPrice: book['ourPrice'] ?? '',
-                          inStock: book['inStock'] ?? true,
-                          imageUrl: book['imageUrl'] ?? '',
-                          likedAt: DateTime.now(),
-                        );
-                        likedBooksService.addToLiked(likedBook);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Added to liked books'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.shopping_cart_outlined, size: 16),
-                    onPressed: () {
-                      final cartModel = Provider.of<CartModel>(context, listen: false);
-                      final cartItem = CartItem(
-                        id: '${book['title']}-${DateTime.now().millisecondsSinceEpoch}',
-                        title: book['title'] ?? '',
-                        author: book['author'] ?? '',
-                        listPrice: book['listPrice'] ?? 'Rs 999',
-                        ourPrice: book['ourPrice'] ?? 'Rs 999',
-                        inStock: true,
-                        imageUrl: book['imageUrl'] ?? '',
-                      );
-                      cartModel.addItem(cartItem);
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('${book['title']} added to cart'),
-                          duration: const Duration(seconds: 2),
-                        ),
-                      );
-                    },
-                    color: Colors.grey.shade600,
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -819,7 +846,22 @@ class BookCardWithActions extends StatelessWidget {
 
 // FilterSheet class remains the same...
 class FilterSheet extends StatefulWidget {
-  const FilterSheet({Key? key}) : super(key: key);
+  final String? initialTitle;
+  final String? initialAuthor;
+  final String? initialCategory;
+  final String? initialPriceRange;
+  final String? initialLanguage;
+  final void Function(Map<String, String?> filters) onApply;
+
+  const FilterSheet({
+    Key? key,
+    this.initialTitle,
+    this.initialAuthor,
+    this.initialCategory,
+    this.initialPriceRange,
+    this.initialLanguage,
+    required this.onApply,
+  }) : super(key: key);
 
   @override
   State<FilterSheet> createState() => _FilterSheetState();
@@ -829,12 +871,9 @@ class _FilterSheetState extends State<FilterSheet> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _authorController = TextEditingController();
   final TextEditingController _categoryController = TextEditingController();
-  final TextEditingController _publisherController = TextEditingController();
-  final TextEditingController _yearController = TextEditingController();
 
   String? selectedPriceRange;
   String? selectedLanguage;
-  String? selectedFormat;
 
   final List<String> priceRanges = [
     'Less than Rs.100',
@@ -850,12 +889,15 @@ class _FilterSheetState extends State<FilterSheet> {
     'Punjabi',
   ];
 
-  final List<String> formats = [
-    'Board Book',
-    'Flexi Bind',
-    'Hard Cover',
-    'Paperback',
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _titleController.text = widget.initialTitle ?? '';
+    _authorController.text = widget.initialAuthor ?? '';
+    _categoryController.text = widget.initialCategory ?? '';
+    selectedPriceRange = widget.initialPriceRange;
+    selectedLanguage = widget.initialLanguage;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -954,38 +996,23 @@ class _FilterSheetState extends State<FilterSheet> {
                         });
                       },
                     ),
-                    const SizedBox(height: 16),
-
-                    _buildDropdownField(
-                      label: 'Format',
-                      value: selectedFormat,
-                      items: formats,
-                      hint: 'Select format',
-                      onChanged: (value) {
-                        setState(() {
-                          selectedFormat = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-
-                    _buildTextField(
-                      controller: _publisherController,
-                      label: 'Publisher',
-                      hint: 'Enter publisher name',
-                    ),
-                    const SizedBox(height: 16),
-
-                    _buildTextField(
-                      controller: _yearController,
-                      label: 'Publication Year',
-                      hint: 'Enter year',
-                      keyboardType: TextInputType.number,
-                    ),
                     const SizedBox(height: 24),
 
                     ElevatedButton(
                       onPressed: () {
+                        widget.onApply({
+                          'title': _titleController.text.trim().isEmpty
+                              ? null
+                              : _titleController.text.trim(),
+                          'author': _authorController.text.trim().isEmpty
+                              ? null
+                              : _authorController.text.trim(),
+                          'category': _categoryController.text.trim().isEmpty
+                              ? null
+                              : _categoryController.text.trim(),
+                          'priceRange': selectedPriceRange,
+                          'language': selectedLanguage,
+                        });
                         Navigator.pop(context);
                       },
                       style: ElevatedButton.styleFrom(
@@ -1013,11 +1040,8 @@ class _FilterSheetState extends State<FilterSheet> {
                           _titleController.clear();
                           _authorController.clear();
                           _categoryController.clear();
-                          _publisherController.clear();
-                          _yearController.clear();
                           selectedPriceRange = null;
                           selectedLanguage = null;
-                          selectedFormat = null;
                         });
                       },
                       style: OutlinedButton.styleFrom(
