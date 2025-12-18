@@ -106,7 +106,7 @@ class AuthService with ChangeNotifier {
     }
   }
 
-  // Reset password
+  // Reset password (Send email link - Original method)
   Future<bool> resetPassword(String email) async {
     try {
       _isLoading = true;
@@ -114,6 +114,42 @@ class AuthService with ChangeNotifier {
       notifyListeners();
 
       await _auth.sendPasswordResetEmail(email: email);
+
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } on FirebaseAuthException catch (e) {
+      _isLoading = false;
+      _errorMessage = _getErrorMessage(e.code);
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = 'An unexpected error occurred. Please try again.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Change password for currently signed-in user
+  Future<bool> changePassword(String newPassword) async {
+    try {
+      _isLoading = true;
+      _errorMessage = null;
+      notifyListeners();
+
+      // Get current user
+      User? currentUser = _auth.currentUser;
+
+      if (currentUser == null) {
+        _errorMessage = 'No user is currently signed in';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      // Update password
+      await currentUser.updatePassword(newPassword);
 
       _isLoading = false;
       notifyListeners();
@@ -149,7 +185,7 @@ class AuthService with ChangeNotifier {
       case 'invalid-email':
         return 'The email address is invalid.';
       case 'weak-password':
-        return 'The password is too weak.';
+        return 'The password is too weak. Use at least 6 characters.';
       case 'operation-not-allowed':
         return 'Email/password accounts are not enabled.';
       case 'user-disabled':
@@ -158,9 +194,10 @@ class AuthService with ChangeNotifier {
         return 'Too many requests. Please try again later.';
       case 'invalid-credential':
         return 'Invalid email or password.';
+      case 'requires-recent-login':
+        return 'For security, please log out and log in again before changing password.';
       default:
         return 'An error occurred. Please try again.';
     }
   }
 }
-
