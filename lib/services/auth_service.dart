@@ -1,9 +1,11 @@
 // auth_service.dart
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
 class AuthService with ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   User? _user;
   bool _isLoading = false;
   String? _errorMessage;
@@ -47,6 +49,18 @@ class AuthService with ChangeNotifier {
       await result.user?.reload();
       _user = _auth.currentUser;
 
+      // Send email verification link
+      await result.user?.sendEmailVerification();
+
+      // Store user data in Firestore for password reset functionality
+      await _firestore.collection('users').doc(result.user!.uid).set({
+        'email': email,
+        'firstName': firstName,
+        'lastName': lastName,
+        'displayName': '$firstName $lastName',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
       _isLoading = false;
       notifyListeners();
       return true;
@@ -73,10 +87,21 @@ class AuthService with ChangeNotifier {
       _errorMessage = null;
       notifyListeners();
 
-      await _auth.signInWithEmailAndPassword(
+      UserCredential result = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
+
+      // Require email verification before allowing login
+      if (!(result.user?.emailVerified ?? false)) {
+        await result.user?.sendEmailVerification();
+        await _auth.signOut();
+        _isLoading = false;
+        _errorMessage =
+            'Please verify your email address. We have sent a verification link to $email.';
+        notifyListeners();
+        return false;
+      }
 
       _isLoading = false;
       notifyListeners();
@@ -126,6 +151,111 @@ class AuthService with ChangeNotifier {
     } catch (e) {
       _isLoading = false;
       _errorMessage = 'An unexpected error occurred. Please try again.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Check if email exists in Firebase Auth
+  Future<bool> checkEmailExists(String email) async {
+    try {
+      _isLoading = true;
+      _errorMessage = null;
+      notifyListeners();
+
+      // Try to fetch sign-in methods for the email
+      final signInMethods = await _auth.fetchSignInMethodsForEmail(email);
+
+      _isLoading = false;
+
+      if (signInMethods.isEmpty) {
+        _errorMessage = 'No account found with this email';
+        notifyListeners();
+        return false;
+      }
+
+      notifyListeners();
+      return true;
+    } on FirebaseAuthException catch (e) {
+      _isLoading = false;
+      _errorMessage = _getErrorMessage(e.code);
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = 'Error verifying email: ${e.toString()}';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Send verification code via Firestore (simulated email)
+  Future<bool> sendVerificationCode(String email, String code) async {
+    try {
+      _isLoading = true;
+      _errorMessage = null;
+      notifyListeners();
+
+      // Store verification code in Firestore with expiration
+      await _firestore.collection('verification_codes').doc(email).set({
+        'code': code,
+        'email': email,
+        'createdAt': FieldValue.serverTimestamp(),
+        'expiresAt': DateTime.now().add(const Duration(minutes: 10)).millisecondsSinceEpoch,
+      });
+
+      // In a real app, you would send this code via email using a service like SendGrid or Firebase Cloud Functions
+      // For now, we're just storing it in Firestore
+      debugPrint('Verification code for $email: $code');
+
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = 'Failed to send verification code: ${e.toString()}';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Update password by email (after verification)
+  Future<bool> updatePasswordByEmail(String email, String newPassword) async {
+    try {
+      _isLoading = true;
+      _errorMessage = null;
+      notifyListeners();
+
+      // Get user by email
+      final signInMethods = await _auth.fetchSignInMethodsForEmail(email);
+
+      if (signInMethods.isEmpty) {
+        _errorMessage = 'User not found';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      // For security, we need to sign in the user temporarily to change password
+      // This is a limitation of Firebase - you need to be authenticated to change password
+      // In a production app, you should use Firebase Admin SDK on the backend
+
+      // Alternative: Use sendPasswordResetEmail and let Firebase handle it
+      await _auth.sendPasswordResetEmail(email: email);
+
+      _errorMessage = 'Password reset link sent to your email. Please check your inbox.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+
+    } on FirebaseAuthException catch (e) {
+      _isLoading = false;
+      _errorMessage = _getErrorMessage(e.code);
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = 'Error updating password: ${e.toString()}';
       notifyListeners();
       return false;
     }

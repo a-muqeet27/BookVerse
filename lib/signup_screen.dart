@@ -54,7 +54,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
           'createdAt': DateTime.now().toIso8601String(),
         });
 
-        // Show success popup
+        // Show verification info popup
         showDialog(
           context: context,
           barrierDismissible: false,
@@ -80,7 +80,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 ),
                 const SizedBox(height: 24),
                 const Text(
-                  'Account Created Successfully!',
+                  'Verify Your Email',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -90,7 +90,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Welcome to BOOKVERSE! Start exploring your universe of books.',
+                  'We have sent a verification link to your email. Please verify your email address before logging in.',
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.grey.shade600,
@@ -103,7 +103,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   child: ElevatedButton(
                     onPressed: () {
                       Navigator.pop(context); // Close dialog
-                      Navigator.pop(context); // Go back to previous screen
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (context) => const LoginScreen()),
+                      );
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green.shade600,
@@ -114,7 +117,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       ),
                     ),
                     child: const Text(
-                      'Start Shopping',
+                      'Go to Login',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,

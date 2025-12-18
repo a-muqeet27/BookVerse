@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'liked_books_service.dart';
+import 'sidebar.dart';
 import 'book_image_widget.dart';
 import 'services/auth_service.dart';
 import 'login_screen.dart';
@@ -46,10 +47,12 @@ class LikedScreen extends StatelessWidget {
             ),
         ],
       ),
-      body: authService.isLoggedIn 
-          ? _buildLikedContent(likedBooksService, context) 
+      drawer: const SideBar(),
+      body: authService.isLoggedIn
+          ? _buildLikedContent(likedBooksService, context)
           : _buildLoginPrompt(context),
     );
+
   }
 
   Widget _buildLoginPrompt(BuildContext context) {

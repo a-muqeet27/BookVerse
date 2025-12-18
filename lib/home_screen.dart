@@ -7,6 +7,8 @@ import 'liked_books_service.dart';
 import 'book_image_widget.dart';
 import 'book_detail_screen.dart';
 import 'services/books_service.dart';
+import 'services/auth_service.dart';
+import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -319,6 +321,36 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+void _showLoginPrompt(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Login Required'),
+      content: const Text('Please login to add items to cart or likes.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const LoginScreen()),
+            );
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue.shade700,
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('Login'),
+        ),
+      ],
+    ),
+  );
+}
+
   Widget _buildSectionWithActions(String title,
       List<Map<String, dynamic>> books) {
     if (books.isEmpty) return const SizedBox();
@@ -373,6 +405,7 @@ class BookCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final likedBooksService = Provider.of<LikedBooksService>(context);
+    final authService = Provider.of<AuthService>(context, listen: false);
     final isLiked = likedBooksService.isBookLiked(bookId);
 
     return SizedBox(
@@ -527,41 +560,49 @@ class BookCard extends StatelessWidget {
                       size: 24,
                       color: isLiked ? Colors.red : Colors.grey.shade600,
                     ),
-                    onPressed: () {
-                      if (isLiked) {
-                        likedBooksService.removeFromLiked(bookId);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Removed from liked books'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      } else {
-                        final likedBook = LikedBook(
-                          id: bookId,
-                          title: book['title'] ?? '',
-                          author: book['author'] ?? '',
-                          listPrice: book['listPrice'] ?? '',
-                          ourPrice: book['ourPrice'] ?? '',
-                          inStock: book['inStock'] ?? true,
-                          imageUrl: book['imageUrl'] ?? '',
-                          likedAt: DateTime.now(),
-                        );
-                        likedBooksService.addToLiked(likedBook);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Added to liked books'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      }
-                    },
+                      onPressed: () {
+                        if (!authService.isLoggedIn) {
+                          _showLoginPrompt(context);
+                          return;
+                        }
+                        if (isLiked) {
+                          likedBooksService.removeFromLiked(bookId);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Removed from liked books'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        } else {
+                          final likedBook = LikedBook(
+                            id: bookId,
+                            title: book['title'] ?? '',
+                            author: book['author'] ?? '',
+                            listPrice: book['listPrice'] ?? '',
+                            ourPrice: book['ourPrice'] ?? '',
+                            inStock: book['inStock'] ?? true,
+                            imageUrl: book['imageUrl'] ?? '',
+                            likedAt: DateTime.now(),
+                          );
+                          likedBooksService.addToLiked(likedBook);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Added to liked books'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
                   ),
 
                   // Cart Button - Actually adds to cart
                   IconButton(
                     icon: const Icon(Icons.shopping_cart_outlined, size: 24),
                     onPressed: isComingSoon ? null : () {
+                      if (!authService.isLoggedIn) {
+                        _showLoginPrompt(context);
+                        return;
+                      }
                       final cartModel = Provider.of<CartModel>(context, listen: false);
                       final cartItem = CartItem(
                         id: '${book['title']}-${DateTime.now().millisecondsSinceEpoch}',
@@ -607,6 +648,7 @@ class BookCardWithActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final likedBooksService = Provider.of<LikedBooksService>(context);
+    final authService = Provider.of<AuthService>(context, listen: false);
     final isLiked = likedBooksService.isBookLiked(bookId);
 
     final inStockQuantity = (book['quantity'] ?? 0) as int;
@@ -793,6 +835,10 @@ class BookCardWithActions extends StatelessWidget {
                         color: isLiked ? Colors.red : Colors.grey.shade600,
                       ),
                       onPressed: () {
+                        if (!authService.isLoggedIn) {
+                          _showLoginPrompt(context);
+                          return;
+                        }
                         if (isLiked) {
                           likedBooksService.removeFromLiked(bookId);
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -825,6 +871,10 @@ class BookCardWithActions extends StatelessWidget {
                     IconButton(
                       icon: const Icon(Icons.shopping_cart_outlined, size: 16),
                       onPressed: () {
+                        if (!authService.isLoggedIn) {
+                          _showLoginPrompt(context);
+                          return;
+                        }
                         final cartModel = Provider.of<CartModel>(context, listen: false);
                         final cartItem = CartItem(
                           bookId: book['id'],
@@ -1168,4 +1218,5 @@ class _FilterSheetState extends State<FilterSheet> {
       ],
     );
   }
+
 }

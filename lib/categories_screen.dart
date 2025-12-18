@@ -7,6 +7,8 @@ import 'liked_books_service.dart';
 import 'book_image_widget.dart';
 import 'book_detail_screen.dart';
 import 'services/books_service.dart';
+import 'services/auth_service.dart';
+import 'login_screen.dart';
 
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({Key? key}) : super(key: key);
@@ -352,6 +354,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   Widget _buildBookCard(Map<String, dynamic> book) {
     final bookId = book['id'] ?? '${book['title']}-${book['author']}';
     final likedBooksService = Provider.of<LikedBooksService>(context);
+    final authService = Provider.of<AuthService>(context, listen: false);
     final isLiked = likedBooksService.isBookLiked(bookId);
     final quantity = (book['quantity'] ?? 0) as int;
     final isAvailable = quantity > 0 || (book['inStock'] ?? false) == true;
@@ -498,6 +501,10 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                   ),
                   onPressed: () {
                     final likedBooksService = Provider.of<LikedBooksService>(context, listen: false);
+                    if (!authService.isLoggedIn) {
+                      _showLoginPrompt(context);
+                      return;
+                    }
 
                     if (likedBooksService.isBookLiked(bookId)) {
                       likedBooksService.removeFromLiked(bookId);
@@ -524,6 +531,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                           content: Text('Added to liked books'),
                           duration: Duration(seconds: 2),
                         ),
+
                       );
                     }
                   },
@@ -532,6 +540,10 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                   icon: Icon(
                       Icons.shopping_cart_outlined, color: Colors.grey.shade600),
                   onPressed: () {
+                  if (!authService.isLoggedIn) {
+                    _showLoginPrompt(context);
+                    return;
+                  }
                     final cartModel = Provider.of<CartModel>(
                         context, listen: false);
                     final cartItem = CartItem(
@@ -658,5 +670,35 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       default:
         return Icons.category;
     }
+  }
+
+  void _showLoginPrompt(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Login Required'),
+        content: const Text('Please login to add items to cart or likes.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade700,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Login'),
+          ),
+        ],
+      ),
+    );
   }
 }

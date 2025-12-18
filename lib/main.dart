@@ -11,9 +11,6 @@ import 'home_screen.dart';
 import 'categories_screen.dart';
 import 'cart_screen.dart';
 import 'sidebar.dart';
-import 'login_screen.dart';
-import 'signup_screen.dart';
-import 'forgot_password_screen.dart';
 import 'liked_screen.dart';
 import 'liked_books_service.dart';
 import 'orders_screen.dart';
@@ -132,7 +129,11 @@ class _HomeScreenWithSplashState extends State<HomeScreenWithSplash>
       body: Stack(
         children: [
           if (_showHomeScreen)
-            _screens[_currentIndex],
+            // Use IndexedStack so each bottom-tab screen keeps its own state
+            IndexedStack(
+              index: _currentIndex,
+              children: _screens,
+            ),
 
           if (!_showHomeScreen)
             FadeTransition(

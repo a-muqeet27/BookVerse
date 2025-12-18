@@ -173,17 +173,6 @@ class SideBar extends StatelessWidget {
           ),
 
           const Divider(),
-
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              'Version 1.0.0',
-              style: TextStyle(
-                color: Colors.grey.shade600,
-                fontSize: 12,
-              ),
-            ),
-          ),
         ],
       ),
     );
